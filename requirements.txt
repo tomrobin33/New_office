@@ -2,3 +2,5 @@ fastmcp
 python-docx
 msoffcrypto-tool
 docx2pdf
+requests
+paramiko

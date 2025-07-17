@@ -17,6 +17,8 @@ from word_document_server.tools import (
     footnote_tools,
     extended_document_tools
 )
+from word_document_server.utils.file_utils import download_file_from_url, upload_file_to_server
+
 def get_transport_config():
     """
     Get transport configuration from environment variables.
@@ -223,6 +225,35 @@ def register_tools():
     def convert_to_pdf(filename: str, output_filename: str = None):
         """Convert a Word document to PDF format."""
         return extended_document_tools.convert_to_pdf(filename, output_filename)
+
+    @mcp.tool()
+    def process_and_upload_file(filename: str = None, file_url: str = None, process_type: str = "copy"):
+        """
+        支持本地文件或URL文件输入，处理后自动上传到服务器并返回公网下载链接。
+        process_type: 目前仅支持'copy'，后续可扩展。
+        """
+        import os
+        LOCAL_TMP_DIR = "tmp_files"
+        REMOTE_DIR = "/root/files"
+        SERVER = "8.156.74.79"
+        USERNAME = "root"
+        PASSWORD = "zfsZBC123."
+        # 1. 下载或定位本地文件
+        if file_url:
+            local_path = download_file_from_url(file_url, LOCAL_TMP_DIR)
+        elif filename:
+            local_path = filename
+        else:
+            return "必须提供filename或file_url"
+        # 2. 处理逻辑（此处可扩展）
+        # 这里只做简单的文件copy，后续可根据process_type扩展
+        processed_path = local_path
+        # 3. 上传到服务器
+        remote_path = os.path.join(REMOTE_DIR, os.path.basename(processed_path))
+        upload_file_to_server(processed_path, remote_path, SERVER, USERNAME, PASSWORD)
+        # 4. 返回公网下载链接
+        public_url = f"http://8.156.74.79:8001/{os.path.basename(processed_path)}"
+        return {"public_url": public_url, "remote_path": remote_path}
 
 
 def run_server():

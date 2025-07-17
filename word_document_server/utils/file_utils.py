@@ -4,6 +4,8 @@ File utility functions for Word Document Server.
 import os
 from typing import Tuple, Optional
 import shutil
+import requests
+import paramiko
 
 
 def check_file_writeable(filepath: str) -> Tuple[bool, str]:
@@ -83,3 +85,31 @@ def ensure_docx_extension(filename: str) -> str:
     if not filename.endswith('.docx'):
         return filename + '.docx'
     return filename
+
+
+def download_file_from_url(url: str, save_dir: str = ".") -> str:
+    """
+    从URL下载文件到本地指定目录，返回本地文件路径。
+    """
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir, exist_ok=True)
+    local_filename = os.path.join(save_dir, url.split("/")[-1].split("?")[0])
+    r = requests.get(url, stream=True)
+    r.raise_for_status()
+    with open(local_filename, 'wb') as f:
+        for chunk in r.iter_content(chunk_size=8192):
+            f.write(chunk)
+    return local_filename
+
+
+def upload_file_to_server(local_path: str, remote_path: str, server: str, username: str, password: str) -> str:
+    """
+    通过SFTP上传文件到远程服务器。
+    """
+    transport = paramiko.Transport((server, 22))
+    transport.connect(username=username, password=password)
+    sftp = paramiko.SFTPClient.from_transport(transport)
+    sftp.put(local_path, remote_path)
+    sftp.close()
+    transport.close()
+    return f"上传成功: {remote_path}"
