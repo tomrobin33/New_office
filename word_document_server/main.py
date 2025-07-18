@@ -312,7 +312,7 @@ def register_tools():
 
     # 新增自动生成并上传Word文档的API
     @mcp.tool()
-    def auto_generate_and_upload_word(
+    async def auto_generate_and_upload_word(
         filename: str,
         content: dict
     ):
@@ -334,11 +334,10 @@ def register_tools():
         import os
         from word_document_server.tools import document_tools, content_tools
         from word_document_server.utils.file_utils import upload_file_to_server
-        import asyncio
         # 1. 创建文档
         title = content.get("title")
         author = content.get("author")
-        create_result = asyncio.run(document_tools.create_document(filename, title, author))
+        create_result = await document_tools.create_document(filename, title, author)
         if not (isinstance(create_result, str) and "created successfully" in create_result):
             return {"error": create_result}
         # 2. 插入标题
@@ -347,14 +346,14 @@ def register_tools():
             text = h.get("text")
             level = h.get("level")
             if text is not None and level is not None:
-                asyncio.run(content_tools.add_heading(filename, text, level))
+                await content_tools.add_heading(filename, text, level)
             elif text is not None:
-                asyncio.run(content_tools.add_heading(filename, text))
+                await content_tools.add_heading(filename, text)
         # 3. 插入段落
         paragraphs = content.get("paragraphs", [])
         for p in paragraphs:
             if p is not None:
-                asyncio.run(content_tools.add_paragraph(filename, p))
+                await content_tools.add_paragraph(filename, p)
         # 4. 插入表格
         tables = content.get("tables", [])
         for t in tables:
@@ -362,17 +361,17 @@ def register_tools():
             if data and isinstance(data, list):
                 rows = len(data)
                 cols = len(data[0]) if data and len(data) > 0 else 0
-                asyncio.run(content_tools.add_table(filename, rows, cols, data))
+                await content_tools.add_table(filename, rows, cols, data)
         # 5. 插入图片
         images = content.get("images", [])
         for img in images:
             path = img.get("path")
             width = img.get("width")
             if path is not None and width is not None:
-                asyncio.run(content_tools.add_picture(filename, path, width))
+                await content_tools.add_picture(filename, path, width)
             elif path is not None:
-                asyncio.run(content_tools.add_picture(filename, path))
-        # 6. 上传文档
+                await content_tools.add_picture(filename, path)
+        # 6. 上传文档（同步调用即可）
         REMOTE_DIR = "/root/files"
         SERVER = "8.156.74.79"
         USERNAME = "root"
