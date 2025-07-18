@@ -311,13 +311,13 @@ def register_tools():
         }
 
     # 新增自动生成并上传Word文档的API
-    @mcp.tool(streaming=True)
+    @mcp.tool()
     async def auto_generate_and_upload_word(
         filename: str,
         content: dict
     ):
         """
-        根据结构化内容自动生成Word文档并上传，流式推送进度，返回公网下载链接。
+        根据结构化内容自动生成Word文档并上传，返回公网下载链接。
         content示例：{
             "title": "报告标题",
             "author": "作者",
@@ -334,14 +334,13 @@ def register_tools():
         import os
         from word_document_server.tools import document_tools, content_tools
         from word_document_server.utils.file_utils import upload_file_to_server
-        yield {"progress": "正在创建Word文档..."}
+        # 1. 创建文档
         title = content.get("title")
         author = content.get("author")
         create_result = await document_tools.create_document(filename, title, author)
         if not (isinstance(create_result, str) and "created successfully" in create_result):
-            yield {"error": create_result}
-            return
-        yield {"progress": "插入标题..."}
+            return {"error": create_result}
+        # 2. 插入标题
         headings = content.get("headings", [])
         for h in headings:
             text = h.get("text")
@@ -350,12 +349,12 @@ def register_tools():
                 await content_tools.add_heading(filename, text, level)
             elif text is not None:
                 await content_tools.add_heading(filename, text)
-        yield {"progress": "插入段落..."}
+        # 3. 插入段落
         paragraphs = content.get("paragraphs", [])
         for p in paragraphs:
             if p is not None:
                 await content_tools.add_paragraph(filename, p)
-        yield {"progress": "插入表格..."}
+        # 4. 插入表格
         tables = content.get("tables", [])
         for t in tables:
             data = t.get("data")
@@ -363,7 +362,7 @@ def register_tools():
                 rows = len(data)
                 cols = len(data[0]) if data and len(data) > 0 else 0
                 await content_tools.add_table(filename, rows, cols, data)
-        yield {"progress": "插入图片..."}
+        # 5. 插入图片
         images = content.get("images", [])
         for img in images:
             path = img.get("path")
@@ -372,7 +371,7 @@ def register_tools():
                 await content_tools.add_picture(filename, path, width)
             elif path is not None:
                 await content_tools.add_picture(filename, path)
-        yield {"progress": "正在上传文档..."}
+        # 6. 上传文档（同步调用即可）
         REMOTE_DIR = "/root/files"
         SERVER = "8.156.74.79"
         USERNAME = "root"
@@ -381,8 +380,7 @@ def register_tools():
         remote_path = os.path.join(REMOTE_DIR, os.path.basename(local_path))
         upload_result = upload_file_to_server(local_path, remote_path, SERVER, USERNAME, PASSWORD)
         public_url = f"http://8.156.74.79:8001/{os.path.basename(local_path)}"
-        yield {
-            "progress": "完成",
+        return {
             "message": "Word文档生成并上传成功",
             "public_url": public_url,
             "remote_path": remote_path,
