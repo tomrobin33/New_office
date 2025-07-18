@@ -310,6 +310,84 @@ def register_tools():
             "upload_result": upload_result
         }
 
+    # 新增自动生成并上传Word文档的API
+    @mcp.tool()
+    def auto_generate_and_upload_word(
+        filename: str,
+        content: dict
+    ):
+        """
+        根据结构化内容自动生成Word文档并上传，返回公网下载链接。
+        content示例：{
+            "title": "报告标题",
+            "author": "作者",
+            "headings": [{"text": "一级标题", "level": 1}],
+            "paragraphs": ["段落1", "段落2"],
+            "tables": [
+                {"data": [["表头1", "表头2"], ["数据1", "数据2"]]}
+            ],
+            "images": [
+                {"path": "本地图片路径", "width": 2.0}
+            ]
+        }
+        """
+        import os
+        from word_document_server.tools import document_tools, content_tools
+        from word_document_server.utils.file_utils import upload_file_to_server
+        import asyncio
+        # 1. 创建文档
+        title = content.get("title")
+        author = content.get("author")
+        create_result = asyncio.run(document_tools.create_document(filename, title, author))
+        if not (isinstance(create_result, str) and "created successfully" in create_result):
+            return {"error": create_result}
+        # 2. 插入标题
+        headings = content.get("headings", [])
+        for h in headings:
+            text = h.get("text")
+            level = h.get("level")
+            if text is not None and level is not None:
+                asyncio.run(content_tools.add_heading(filename, text, level))
+            elif text is not None:
+                asyncio.run(content_tools.add_heading(filename, text))
+        # 3. 插入段落
+        paragraphs = content.get("paragraphs", [])
+        for p in paragraphs:
+            if p is not None:
+                asyncio.run(content_tools.add_paragraph(filename, p))
+        # 4. 插入表格
+        tables = content.get("tables", [])
+        for t in tables:
+            data = t.get("data")
+            if data and isinstance(data, list):
+                rows = len(data)
+                cols = len(data[0]) if data and len(data) > 0 else 0
+                asyncio.run(content_tools.add_table(filename, rows, cols, data))
+        # 5. 插入图片
+        images = content.get("images", [])
+        for img in images:
+            path = img.get("path")
+            width = img.get("width")
+            if path is not None and width is not None:
+                asyncio.run(content_tools.add_picture(filename, path, width))
+            elif path is not None:
+                asyncio.run(content_tools.add_picture(filename, path))
+        # 6. 上传文档
+        REMOTE_DIR = "/root/files"
+        SERVER = "8.156.74.79"
+        USERNAME = "root"
+        PASSWORD = "zfsZBC123."
+        local_path = filename
+        remote_path = os.path.join(REMOTE_DIR, os.path.basename(local_path))
+        upload_result = upload_file_to_server(local_path, remote_path, SERVER, USERNAME, PASSWORD)
+        public_url = f"http://8.156.74.79:8001/{os.path.basename(local_path)}"
+        return {
+            "message": "Word文档生成并上传成功",
+            "public_url": public_url,
+            "remote_path": remote_path,
+            "upload_result": upload_result
+        }
+
 
 def run_server():
     """Run the Word Document MCP Server with configurable transport."""
