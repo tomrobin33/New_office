@@ -18,6 +18,7 @@ from word_document_server.tools import (
     extended_document_tools
 )
 from word_document_server.utils.file_utils import download_file_from_url, upload_file_to_server
+from typing import Optional
 
 def get_transport_config():
     """
@@ -226,34 +227,88 @@ def register_tools():
         """Convert a Word document to PDF format."""
         return extended_document_tools.convert_to_pdf(filename, output_filename)
 
+    # 注册 process_file 工具（已替换 process_and_upload_file）
     @mcp.tool()
-    def process_and_upload_file(filename: str = None, file_url: str = None, process_type: str = "copy"):
+    def process_file(filename: Optional[str] = None, file_url: Optional[str] = None, process_type: str = "extract"):
         """
-        支持本地文件或URL文件输入，处理后自动上传到服务器并返回公网下载链接。
-        process_type: 目前仅支持'copy'，后续可扩展。
+        支持本地文件或URL文件输入，解析后返回全部内容信息（文本、表格、图表、元信息等），不上传文件。
+        process_type: 目前仅支持'extract'，后续可扩展。
         """
         import os
+        import json
+        from word_document_server.utils.file_utils import download_file_from_url
+        from word_document_server.utils.document_utils import get_document_properties, extract_document_text, get_document_structure
+        from docx import Document
         LOCAL_TMP_DIR = "tmp_files"
+        # 1. 下载或定位本地文件
+        if file_url is not None:
+            local_path = download_file_from_url(file_url, LOCAL_TMP_DIR)
+        elif filename is not None:
+            local_path = filename
+        else:
+            return {"error": "必须提供filename或file_url"}
+        if not os.path.exists(local_path):
+            return {"error": f"文件不存在: {local_path}"}
+        # 2. 解析文档内容
+        try:
+            doc = Document(local_path)
+            # 文本内容
+            text = "\n".join([p.text for p in doc.paragraphs])
+            # 表格内容
+            tables = []
+            for table in doc.tables:
+                table_data = []
+                for row in table.rows:
+                    table_data.append([cell.text for cell in row.cells])
+                tables.append(table_data)
+            # 图表信息（简单提取嵌入图片）
+            images = []
+            for rel in doc.part.rels.values():
+                if hasattr(rel, 'target_ref') and rel.target_ref and "image" in rel.target_ref:
+                    images.append(rel.target_ref)
+            # 元信息
+            meta = get_document_properties(str(local_path))
+            # 结构化大纲
+            outline = get_document_structure(str(local_path))
+            return {
+                "text": text,
+                "tables": tables,
+                "images": images,
+                "meta": meta,
+                "outline": outline
+            }
+        except Exception as e:
+            return {"error": f"解析文档失败: {str(e)}"}
+
+    # 新增 create_document_and_upload 工具
+    @mcp.tool()
+    def create_document_and_upload(filename: str, title: str = None, author: str = None):
+        """
+        创建 Word 文档并上传到服务器，返回公网下载链接和服务器路径。
+        """
+        import os
+        from word_document_server.tools import document_tools
+        from word_document_server.utils.file_utils import upload_file_to_server
+        # 1. 创建文档
+        result = document_tools.create_document(filename, title, author)
+        # 2. 检查创建是否成功
+        if not (isinstance(result, str) and "created successfully" in result):
+            return {"error": result}
+        # 3. 上传到服务器
         REMOTE_DIR = "/root/files"
         SERVER = "8.156.74.79"
         USERNAME = "root"
         PASSWORD = "zfsZBC123."
-        # 1. 下载或定位本地文件
-        if file_url:
-            local_path = download_file_from_url(file_url, LOCAL_TMP_DIR)
-        elif filename:
-            local_path = filename
-        else:
-            return "必须提供filename或file_url"
-        # 2. 处理逻辑（此处可扩展）
-        # 这里只做简单的文件copy，后续可根据process_type扩展
-        processed_path = local_path
-        # 3. 上传到服务器
-        remote_path = os.path.join(REMOTE_DIR, os.path.basename(processed_path))
-        upload_file_to_server(processed_path, remote_path, SERVER, USERNAME, PASSWORD)
-        # 4. 返回公网下载链接
-        public_url = f"http://8.156.74.79:8001/{os.path.basename(processed_path)}"
-        return {"public_url": public_url, "remote_path": remote_path}
+        local_path = filename
+        remote_path = os.path.join(REMOTE_DIR, os.path.basename(local_path))
+        upload_result = upload_file_to_server(local_path, remote_path, SERVER, USERNAME, PASSWORD)
+        public_url = f"http://8.156.74.79:8001/{os.path.basename(local_path)}"
+        return {
+            "message": result,
+            "public_url": public_url,
+            "remote_path": remote_path,
+            "upload_result": upload_result
+        }
 
 
 def run_server():
