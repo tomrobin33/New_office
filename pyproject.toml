@@ -51,3 +51,5 @@ sources = ["."]
 
 [project.scripts]
 word_mcp_server = "word_document_server.main:run_server"
+
+# 文本清理依赖：re为Python标准库，无需额外安装

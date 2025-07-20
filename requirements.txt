@@ -16,3 +16,6 @@ Pillow>=9.0.0
 
 # 类型提示支持
 typing-extensions>=4.0.0
+
+# 文本清理依赖
+# re为Python标准库，无需额外安装

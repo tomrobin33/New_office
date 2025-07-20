@@ -31,6 +31,7 @@ import os
 from typing import List, Optional, Dict, Any
 from docx import Document
 from docx.shared import Inches, Pt
+import re
 
 from word_document_server.utils.file_utils import check_file_writeable, ensure_docx_extension
 from word_document_server.core.styles import ensure_heading_style, ensure_table_style
@@ -284,6 +285,25 @@ class BatchDocumentProcessor:
         self.doc = None
 
 
+def clean_text(s: str) -> str:
+    """
+    清理字符串中的所有XML不兼容控制字符（如\u000b、\x00等），保留常用换行、回车、制表符。
+    """
+    if not isinstance(s, str):
+        return s
+    # 替换所有控制字符为空格（保留\n、\r、\t）
+    return re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', ' ', s)
+
+def clean_slides(slides: list) -> list:
+    """
+    对slides结构中的所有text字符串进行清理，移除控制字符。
+    """
+    for slide in slides:
+        if 'text' in slide and isinstance(slide['text'], list):
+            slide['text'] = [clean_text(t) for t in slide['text']]
+    return slides
+
+
 def slides_to_content(slides: list) -> dict:
     """
     【自动结构转换】
@@ -403,8 +423,9 @@ async def batch_generate_word_document(
     }
     result = await batch_generate_word_document("report.docx", content)
     """
-    # 新增：自动识别slides结构
+    # 新增：如果是slides结构，先清理
     if "slides" in content and isinstance(content["slides"], list):
+        content["slides"] = clean_slides(content["slides"])
         content = slides_to_content(content["slides"])
 
     processor = BatchDocumentProcessor(filename)
@@ -580,6 +601,11 @@ async def batch_generate_and_upload_word(
     import os
     from word_document_server.utils.file_utils import upload_file_to_server
     
+    # 新增：如果是slides结构，先清理
+    if "slides" in content and isinstance(content["slides"], list):
+        content["slides"] = clean_slides(content["slides"])
+        content = slides_to_content(content["slides"])
+
     # 1. 批量生成文档
     batch_result = await batch_generate_word_document(filename, content, save_after_batch=True)
     
