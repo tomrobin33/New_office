@@ -286,12 +286,24 @@ class BatchDocumentProcessor:
 
 def slides_to_content(slides: list) -> dict:
     """
-    将PPT风格的slides结构自动转换为Word content结构。
+    【自动结构转换】
+    本函数用于将PPT风格的slides结构自动转换为Word生成工具所需的content结构。
+    
+    支持如下输入：
     slides: [
         {"slide_index": 1, "text": ["标题", "段落1", ...]},
         ...
     ]
-    返回: content dict
+    
+    转换后输出：
+    content: {
+        "title": "...",
+        "author": "...",
+        "headings": [...],
+        "paragraphs": [...]
+    }
+    
+    这样可以让大模型/Agent直接传递PPT风格的结构，系统会自动适配，无需手动转换。
     """
     if not slides or not isinstance(slides, list):
         return {}
@@ -326,7 +338,13 @@ async def batch_generate_word_document(
     """
     批量生成Word文档 - 核心优化函数
     
-    兼容 slides 结构自动转换。
+    【自动结构识别】
+    本函数支持两种输入结构：
+    1. 标准content结构（title/headings/paragraphs等）
+    2. PPT风格slides结构（slides: [ ... ]）
+    
+    如果检测到content中包含slides字段，会自动调用slides_to_content进行结构转换，
+    让大模型/Agent可以直接传递PPT风格的结构，无需手动转换。
     
     这个函数实现了完整的批量文档生成流程，是性能优化的核心实现。
     它使用BatchDocumentProcessor在内存中处理所有内容，最后统一保存，避免了频繁的磁盘I/O操作。
@@ -505,7 +523,13 @@ async def batch_generate_and_upload_word(
     """
     批量生成Word文档并上传到服务器 - 一站式解决方案
     
-    兼容 slides 结构自动转换。
+    【自动结构识别】
+    本函数支持两种输入结构：
+    1. 标准content结构（title/headings/paragraphs等）
+    2. PPT风格slides结构（slides: [ ... ]）
+    
+    如果检测到content中包含slides字段，会自动调用slides_to_content进行结构转换，
+    让大模型/Agent可以直接传递PPT风格的结构，无需手动转换。
     
     这个函数是批量处理功能的完整实现，结合了文档生成和服务器上传功能。
     它首先使用优化的批量处理方法生成Word文档，然后自动上传到服务器并返回公网下载链接。
