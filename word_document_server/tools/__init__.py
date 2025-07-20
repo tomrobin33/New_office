@@ -35,3 +35,9 @@ from word_document_server.tools.footnote_tools import (
     add_footnote_to_document, add_endnote_to_document,
     convert_footnotes_to_endnotes_in_document, customize_footnote_style
 )
+
+# Batch content tools
+from word_document_server.tools.batch_content_tools import (
+    BatchDocumentProcessor, batch_generate_word_document,
+    batch_generate_and_upload_word
+)
