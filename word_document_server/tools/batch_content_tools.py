@@ -284,6 +284,40 @@ class BatchDocumentProcessor:
         self.doc = None
 
 
+def slides_to_content(slides: list) -> dict:
+    """
+    将PPT风格的slides结构自动转换为Word content结构。
+    slides: [
+        {"slide_index": 1, "text": ["标题", "段落1", ...]},
+        ...
+    ]
+    返回: content dict
+    """
+    if not slides or not isinstance(slides, list):
+        return {}
+    content = {
+        "title": slides[0]["text"][0] if slides and slides[0]["text"] else "",
+        "author": "",
+        "headings": [],
+        "paragraphs": []
+    }
+    # 尝试自动提取作者
+    for t in slides[0]["text"]:
+        if t.startswith("作者") or t.startswith("Author"):
+            content["author"] = t.replace("作者:", "").replace("Author:", "").strip()
+    # 第一页剩余内容作为段落
+    content["paragraphs"].extend(slides[0]["text"][1:])
+    # 其余页处理
+    for slide in slides[1:]:
+        if not slide["text"]:
+            continue
+        heading_text = slide["text"][0]
+        content["headings"].append({"text": heading_text, "level": 1})
+        if len(slide["text"]) > 1:
+            content["paragraphs"].extend(slide["text"][1:])
+    return content
+
+
 async def batch_generate_word_document(
     filename: str,
     content: dict,
@@ -291,6 +325,8 @@ async def batch_generate_word_document(
 ) -> Dict[str, Any]:
     """
     批量生成Word文档 - 核心优化函数
+    
+    兼容 slides 结构自动转换。
     
     这个函数实现了完整的批量文档生成流程，是性能优化的核心实现。
     它使用BatchDocumentProcessor在内存中处理所有内容，最后统一保存，避免了频繁的磁盘I/O操作。
@@ -349,6 +385,10 @@ async def batch_generate_word_document(
     }
     result = await batch_generate_word_document("report.docx", content)
     """
+    # 新增：自动识别slides结构
+    if "slides" in content and isinstance(content["slides"], list):
+        content = slides_to_content(content["slides"])
+
     processor = BatchDocumentProcessor(filename)
     results = []
     stats = {
@@ -464,6 +504,8 @@ async def batch_generate_and_upload_word(
 ) -> Dict[str, Any]:
     """
     批量生成Word文档并上传到服务器 - 一站式解决方案
+    
+    兼容 slides 结构自动转换。
     
     这个函数是批量处理功能的完整实现，结合了文档生成和服务器上传功能。
     它首先使用优化的批量处理方法生成Word文档，然后自动上传到服务器并返回公网下载链接。
