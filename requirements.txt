@@ -1,4 +1,18 @@
-python-docx
-paramiko
-requests
-fastmcp
+# 核心依赖
+python-docx>=1.1.2
+fastmcp>=2.8.1
+
+# 文件处理和上传
+paramiko>=3.0.0
+requests>=2.28.0
+
+# 文档处理
+msoffcrypto-tool>=5.4.2
+docx2pdf>=0.1.8
+
+# XML和图片处理（python-docx依赖）
+lxml>=4.9.0
+Pillow>=9.0.0
+
+# 类型提示支持
+typing-extensions>=4.0.0
