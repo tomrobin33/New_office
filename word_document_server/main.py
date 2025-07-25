@@ -445,27 +445,30 @@ def register_tools():
         """
         return await batch_content_tools.batch_generate_word_document(filename, content, save_after_batch)
 
-    # ========== 分批写入Word文档API ==========
+    # ========== 分批写入Word文档API（强烈推荐大模型优先使用，始终对外暴露） ==========
+    # 说明：以下API专为大数据/分批写入场景设计，支持open/append/save/close全流程，
+    #       必须在MCP工具列表中始终暴露，供大模型分批写入Word文档时优先调用。
+    #       如需大数据处理，必须优先用这些API，避免一次性超时。
     from word_document_server.tools import batch_content_tools as batch_tools
 
     @mcp.tool()
     def open_batch_word_session(filename: str, title: str = None, author: str = None):
-        """新建或打开一个Word文档会话，返回session_id。"""
+        """新建或打开一个Word文档会话，返回session_id。分批写入推荐入口。"""
         return batch_tools.open_batch_word_session(filename, title, author)
 
     @mcp.tool()
     def append_to_word_session(session_id: str, content_part: dict):
-        """将一部分内容追加到session对应的文档对象。"""
+        """将一部分内容追加到session对应的文档对象。分批写入推荐入口。"""
         return batch_tools.append_to_word_session(session_id, content_part)
 
     @mcp.tool()
     def save_and_upload_word_session(session_id: str):
-        """保存并上传文档，返回公网链接，并释放内存。"""
+        """保存并上传文档，返回公网链接，并释放内存。分批写入推荐入口。"""
         return batch_tools.save_and_upload_word_session(session_id)
 
     @mcp.tool()
     def close_word_session(session_id: str):
-        """主动关闭并释放文档会话（不保存）。"""
+        """主动关闭并释放文档会话（不保存）。分批写入推荐入口。"""
         return batch_tools.close_word_session(session_id)
 
 
