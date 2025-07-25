@@ -445,6 +445,29 @@ def register_tools():
         """
         return await batch_content_tools.batch_generate_word_document(filename, content, save_after_batch)
 
+    # ========== 分批写入Word文档API ==========
+    from word_document_server.tools import batch_content_tools as batch_tools
+
+    @mcp.tool()
+    def open_batch_word_session(filename: str, title: str = None, author: str = None):
+        """新建或打开一个Word文档会话，返回session_id。"""
+        return batch_tools.open_batch_word_session(filename, title, author)
+
+    @mcp.tool()
+    def append_to_word_session(session_id: str, content_part: dict):
+        """将一部分内容追加到session对应的文档对象。"""
+        return batch_tools.append_to_word_session(session_id, content_part)
+
+    @mcp.tool()
+    def save_and_upload_word_session(session_id: str):
+        """保存并上传文档，返回公网链接，并释放内存。"""
+        return batch_tools.save_and_upload_word_session(session_id)
+
+    @mcp.tool()
+    def close_word_session(session_id: str):
+        """主动关闭并释放文档会话（不保存）。"""
+        return batch_tools.close_word_session(session_id)
+
 
 def run_server():
     """Run the Word Document MCP Server with configurable transport."""

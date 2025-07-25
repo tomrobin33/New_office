@@ -26,15 +26,15 @@
 auto_generate_and_upload_word(
     filename: str,  # 目标Word文件名（如 "report.docx"）
     content: dict   # 结构化内容字典，格式如下：
-    {
-        "title": "报告标题",
-        "author": "作者",
-        "headings": [{"text": "一级标题", "level": 1}],
-        "paragraphs": ["段落1", "段落2"],
-        "tables": [{"data": [["表头1", "表头2"], ["数据1", "数据2"]]}],
-        "images": [{"path": "本地图片路径", "width": 2.0}],
-        "page_breaks": [True, True]  # 可选：在指定位置添加分页符
-    }
+{
+    "title": "报告标题",
+    "author": "作者",
+    "headings": [{"text": "一级标题", "level": 1}],
+    "paragraphs": ["段落1", "段落2"],
+    "tables": [{"data": [["表头1", "表头2"], ["数据1", "数据2"]]}],
+    "images": [{"path": "本地图片路径", "width": 2.0}],
+    "page_breaks": [True, True]  # 可选：在指定位置添加分页符
+}
 )
 ```
 
