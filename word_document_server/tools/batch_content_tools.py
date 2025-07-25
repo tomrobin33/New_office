@@ -34,6 +34,8 @@ from docx.shared import Inches, Pt
 import re
 import uuid
 import threading
+import logging
+import time
 
 from word_document_server.utils.file_utils import check_file_writeable, ensure_docx_extension
 from word_document_server.core.styles import ensure_heading_style, ensure_table_style
@@ -64,6 +66,18 @@ from word_document_server.core.styles import ensure_heading_style, ensure_table_
 word_sessions = {}
 word_sessions_lock = threading.Lock()
 
+# session超时清理机制预留（可定期调用）
+SESSION_TIMEOUT = 3600  # 1小时
+
+def cleanup_expired_sessions():
+    now = time.time()
+    with word_sessions_lock:
+        expired = [sid for sid, s in word_sessions.items() if now - s.get('last_active', now) > SESSION_TIMEOUT]
+        for sid in expired:
+            logging.info(f"Session {sid} expired and removed.")
+            word_sessions[sid]["processor"].close()
+            del word_sessions[sid]
+
 # ========== 分批写入API ==========
 
 def open_batch_word_session(filename: str, title: str = None, author: str = None) -> dict:
@@ -74,9 +88,11 @@ def open_batch_word_session(filename: str, title: str = None, author: str = None
     session_id = str(uuid.uuid4())
     processor = BatchDocumentProcessor(filename)
     processor.create_document(title, author)
+    now = time.time()
     with word_sessions_lock:
-        word_sessions[session_id] = {"processor": processor, "filename": filename}
-    return {"session_id": session_id}
+        word_sessions[session_id] = {"processor": processor, "filename": filename, "last_active": now}
+    logging.info(f"[open_batch_word_session] session_id={session_id}, filename={filename}")
+    return {"success": True, "session_id": session_id}
 
 
 def append_to_word_session(session_id: str, content_part: dict) -> dict:
@@ -87,22 +103,34 @@ def append_to_word_session(session_id: str, content_part: dict) -> dict:
     """
     with word_sessions_lock:
         session = word_sessions.get(session_id)
+        if session:
+            session["last_active"] = time.time()
     if not session:
-        return {"error": f"Session {session_id} not found"}
+        logging.warning(f"[append_to_word_session] session_id={session_id} not found.")
+        return {"success": False, "error": f"Session {session_id} not found"}
     processor = session["processor"]
     results = []
+    # 校验content_part结构
+    if not isinstance(content_part, dict):
+        return {"success": False, "error": "content_part must be a dict"}
     # 支持headings、paragraphs、tables、images、page_breaks
     headings = content_part.get("headings", [])
+    if not isinstance(headings, list):
+        return {"success": False, "error": "headings must be a list"}
     for h in headings:
         text = h.get("text")
         level = h.get("level", 1)
         if text is not None:
             results.append(processor.add_heading(text, level))
     paragraphs = content_part.get("paragraphs", [])
+    if not isinstance(paragraphs, list):
+        return {"success": False, "error": "paragraphs must be a list"}
     for p in paragraphs:
         if p is not None:
             results.append(processor.add_paragraph(p))
     tables = content_part.get("tables", [])
+    if not isinstance(tables, list):
+        return {"success": False, "error": "tables must be a list"}
     for t in tables:
         data = t.get("data")
         if data and isinstance(data, list):
@@ -110,15 +138,20 @@ def append_to_word_session(session_id: str, content_part: dict) -> dict:
             cols = len(data[0]) if data and len(data) > 0 else 0
             results.append(processor.add_table(rows, cols, data))
     images = content_part.get("images", [])
+    if not isinstance(images, list):
+        return {"success": False, "error": "images must be a list"}
     for img in images:
         path = img.get("path")
         width = img.get("width")
         if path is not None:
             results.append(processor.add_picture(path, width))
     page_breaks = content_part.get("page_breaks", [])
+    if not isinstance(page_breaks, list):
+        return {"success": False, "error": "page_breaks must be a list"}
     for _ in page_breaks:
         results.append(processor.add_page_break())
-    return {"message": "Content appended", "results": results}
+    logging.info(f"[append_to_word_session] session_id={session_id}, content_keys={list(content_part.keys())}")
+    return {"success": True, "message": "Content appended", "results": results}
 
 
 def save_and_upload_word_session(session_id: str) -> dict:
@@ -129,7 +162,8 @@ def save_and_upload_word_session(session_id: str) -> dict:
     with word_sessions_lock:
         session = word_sessions.pop(session_id, None)
     if not session:
-        return {"error": f"Session {session_id} not found"}
+        logging.warning(f"[save_and_upload_word_session] session_id={session_id} not found.")
+        return {"success": False, "error": f"Session {session_id} not found"}
     processor = session["processor"]
     filename = session["filename"]
     save_result = processor.save_document()
@@ -145,7 +179,9 @@ def save_and_upload_word_session(session_id: str) -> dict:
     remote_path = os.path.join(REMOTE_DIR, os.path.basename(local_path))
     upload_result = upload_file_to_server(local_path, remote_path, SERVER, USERNAME, PASSWORD)
     public_url = f"http://8.156.74.79:8001/{os.path.basename(local_path)}"
+    logging.info(f"[save_and_upload_word_session] session_id={session_id}, filename={filename}, public_url={public_url}")
     return {
+        "success": True,
         "message": save_result,
         "public_url": public_url,
         "remote_path": remote_path,
@@ -161,10 +197,12 @@ def close_word_session(session_id: str) -> dict:
     with word_sessions_lock:
         session = word_sessions.pop(session_id, None)
     if not session:
-        return {"error": f"Session {session_id} not found"}
+        logging.warning(f"[close_word_session] session_id={session_id} not found.")
+        return {"success": False, "error": f"Session {session_id} not found"}
     processor = session["processor"]
     processor.close()
-    return {"message": "Session closed and memory released."}
+    logging.info(f"[close_word_session] session_id={session_id} closed and memory released.")
+    return {"success": True, "message": "Session closed and memory released."}
 
 
 class BatchDocumentProcessor:
@@ -478,6 +516,18 @@ def slides_to_content(slides: list) -> dict:
         if len(slide["text"]) > 1:
             content["paragraphs"].extend(slide["text"][1:])
     return content
+
+# ========== slides_to_content 工具暴露 ==========
+
+def slides_to_content_tool(slides: list) -> dict:
+    """
+    MCP工具：将PPT风格的slides结构转换为Word文档生成所需的content结构。
+    Args:
+        slides: PPT风格的slides数组
+    Returns:
+        dict: 标准Word结构（title, headings, paragraphs等）
+    """
+    return slides_to_content(slides)
 
 
 async def batch_generate_word_document(

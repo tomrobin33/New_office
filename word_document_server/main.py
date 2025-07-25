@@ -471,6 +471,12 @@ def register_tools():
         """主动关闭并释放文档会话（不保存）。分批写入推荐入口。"""
         return batch_tools.close_word_session(session_id)
 
+    # ========== slides_to_content 工具注册 ==========
+    @mcp.tool()
+    def slides_to_content_tool(slides: list):
+        """将PPT风格的slides结构转换为Word文档生成所需的content结构。"""
+        return batch_tools.slides_to_content_tool(slides)
+
 
 def run_server():
     """Run the Word Document MCP Server with configurable transport."""
