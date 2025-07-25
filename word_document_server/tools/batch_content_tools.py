@@ -212,7 +212,7 @@ class BatchDocumentProcessor:
     这个类实现了在内存中批量处理Word文档的功能，避免了传统方法中每次操作都要重新打开、修改、保存文档的性能问题。
     
     工作原理：
-    1. 初始化时创建或打开文档，将文档对象保存在内存中
+    1. 初始化时创建或打开文档，将文档对象加载到内存中
     2. 所有添加内容的操作都在内存中进行，不涉及磁盘I/O
     3. 最后调用save_document()一次性保存所有更改
     4. 使用close()方法清理内存资源
@@ -522,11 +522,16 @@ def slides_to_content(slides: list) -> dict:
 def slides_to_content_tool(slides: list) -> dict:
     """
     MCP工具：将PPT风格的slides结构转换为Word文档生成所需的content结构。
+    兼容slides中每个slide的content/text字段。
     Args:
         slides: PPT风格的slides数组
     Returns:
         dict: 标准Word结构（title, headings, paragraphs等）
     """
+    # 兼容content/text字段
+    for slide in slides:
+        if "content" in slide and "text" not in slide:
+            slide["text"] = slide["content"]
     return slides_to_content(slides)
 
 
