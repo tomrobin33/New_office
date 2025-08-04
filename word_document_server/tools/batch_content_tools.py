@@ -786,13 +786,53 @@ async def batch_generate_and_upload_word(
     import os
     from word_document_server.utils.file_utils import upload_file_to_server
     
+    # 【新增】参数格式验证和自动修正
+    # 处理大模型可能传递的错误格式
+    corrected_content = content
+    corrected_filename = filename
+    
+    # 检查是否是大模型常见的错误格式
+    if isinstance(content, dict):
+        # 情况1：content中包含了filename和content字段（最优先处理）
+        if "filename" in content and "content" in content:
+            corrected_filename = content["filename"]
+            corrected_content = content["content"]
+            print(f"[参数修正] 检测到错误格式，已自动修正：filename={corrected_filename}")
+        
+        # 情况2：content中只有content字段
+        elif "content" in content and len(content) == 1:
+            corrected_content = content["content"]
+            print(f"[参数修正] 检测到嵌套content格式，已自动提取")
+        
+        # 情况3：content中包含了其他不应该存在的字段（但不在情况1中）
+        elif any(field in content for field in ["filename", "file_name", "name"]):
+            # 提取有效的content部分
+            valid_content = {}
+            for key, value in content.items():
+                if key not in ["filename", "file_name", "name"]:
+                    valid_content[key] = value
+            corrected_content = valid_content
+            print(f"[参数修正] 检测到无效字段，已自动清理")
+    
+    # 验证修正后的content格式
+    if not isinstance(corrected_content, dict):
+        return {
+            "error": f"参数格式错误：content必须是字典类型，当前类型为{type(corrected_content)}",
+            "expected_format": {
+                "title": "文档标题（可选）",
+                "author": "文档作者（可选）", 
+                "headings": [{"text": "标题文本", "level": 1}],
+                "tables": [{"data": [["表头1", "表头2"], ["数据1", "数据2"]]}]
+            }
+        }
+    
     # 新增：如果是slides结构，先清理
-    if "slides" in content and isinstance(content["slides"], list):
-        content["slides"] = clean_slides(content["slides"])
-        content = slides_to_content(content["slides"])
+    if "slides" in corrected_content and isinstance(corrected_content["slides"], list):
+        corrected_content["slides"] = clean_slides(corrected_content["slides"])
+        corrected_content = slides_to_content(corrected_content["slides"])
 
     # 1. 批量生成文档
-    batch_result = await batch_generate_word_document(filename, content, save_after_batch=True)
+    batch_result = await batch_generate_word_document(corrected_filename, corrected_content, save_after_batch=True)
     
     if "error" in batch_result:
         return batch_result
@@ -803,7 +843,7 @@ async def batch_generate_and_upload_word(
         SERVER = "8.156.74.79"
         USERNAME = "root"
         PASSWORD = "zfsZBC123."
-        local_path = filename
+        local_path = corrected_filename
         remote_path = os.path.join(REMOTE_DIR, os.path.basename(local_path))
         upload_result = upload_file_to_server(local_path, remote_path, SERVER, USERNAME, PASSWORD)
         public_url = f"http://8.156.74.79:8001/{os.path.basename(local_path)}"
