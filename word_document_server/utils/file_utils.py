@@ -93,7 +93,19 @@ def download_file_from_url(url: str, save_dir: str = ".") -> str:
     """
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
-    local_filename = os.path.join(save_dir, url.split("/")[-1].split("?")[0])
+    
+    # 清理URL，移除末尾的斜杠
+    cleaned_url = url.rstrip('/')
+    
+    # 从URL中提取文件名
+    filename = cleaned_url.split("/")[-1].split("?")[0]
+    
+    # 如果文件名为空，生成一个默认文件名
+    if not filename:
+        import hashlib
+        filename = f"downloaded_file_{hashlib.md5(cleaned_url.encode()).hexdigest()[:8]}"
+    
+    local_filename = os.path.join(save_dir, filename)
     r = requests.get(url, stream=True)
     r.raise_for_status()
     with open(local_filename, 'wb') as f:
