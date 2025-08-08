@@ -106,12 +106,42 @@ def download_file_from_url(url: str, save_dir: str = ".") -> str:
         filename = f"downloaded_file_{hashlib.md5(cleaned_url.encode()).hexdigest()[:8]}"
     
     local_filename = os.path.join(save_dir, filename)
-    r = requests.get(url, stream=True)
-    r.raise_for_status()
-    with open(local_filename, 'wb') as f:
-        for chunk in r.iter_content(chunk_size=8192):
-            f.write(chunk)
-    return local_filename
+    
+    # 设置请求头，模拟浏览器请求
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'application/pdf,application/octet-stream,*/*',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+    }
+    
+    try:
+        # 使用更宽松的请求设置
+        r = requests.get(cleaned_url, stream=True, headers=headers, timeout=30, allow_redirects=True)
+        r.raise_for_status()
+        
+        with open(local_filename, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+        
+        return local_filename
+        
+    except requests.exceptions.RequestException as e:
+        # 如果第一次请求失败，尝试使用原始URL（不清理斜杠）
+        try:
+            r = requests.get(url, stream=True, headers=headers, timeout=30, allow_redirects=True)
+            r.raise_for_status()
+            
+            with open(local_filename, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            return local_filename
+            
+        except requests.exceptions.RequestException as e2:
+            raise Exception(f"下载文件失败: {str(e2)}")
 
 
 def upload_file_to_server(local_path: str, remote_path: str, server: str, username: str, password: str) -> str:
