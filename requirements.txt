@@ -10,6 +10,11 @@ requests>=2.28.0
 msoffcrypto-tool>=5.4.2
 docx2pdf>=0.1.8
 
+# 图片提取工具依赖
+PyMuPDF>=1.23.0  # PDF文件处理
+python-pptx>=0.6.21  # PowerPoint文件处理
+openpyxl>=3.1.0  # Excel文件处理
+
 # XML和图片处理（python-docx依赖）
 lxml>=4.9.0
 Pillow>=9.0.0

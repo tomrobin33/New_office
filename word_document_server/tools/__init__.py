@@ -41,3 +41,9 @@ from word_document_server.tools.batch_content_tools import (
     BatchDocumentProcessor, batch_generate_word_document,
     batch_generate_and_upload_word
 )
+
+# Image extraction tools
+from word_document_server.tools.image_extraction_tools import (
+    ImageExtractor, extract_images_from_file,
+    extract_images_and_upload, get_supported_formats
+)

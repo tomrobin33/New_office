@@ -18,6 +18,7 @@ from word_document_server.tools import (
     extended_document_tools
 )
 from word_document_server.tools import batch_content_tools
+from word_document_server.tools import image_extraction_tools
 from word_document_server.utils.file_utils import download_file_from_url, upload_file_to_server
 from typing import Optional
 
@@ -476,6 +477,22 @@ def register_tools():
     def slides_to_content_tool(slides: list):
         """将PPT风格的slides结构转换为Word文档生成所需的content结构。"""
         return batch_tools.slides_to_content_tool(slides)
+
+    # ========== 图片提取工具注册 ==========
+    @mcp.tool()
+    def extract_images_from_file(file_path: str = None, file_url: str = None, output_filename: str = None):
+        """从Word/PDF/PPT/Excel文件中提取图片并打包为ZIP文件。支持本地文件路径或远程URL。"""
+        return image_extraction_tools.extract_images_from_file(file_path, file_url, output_filename)
+
+    @mcp.tool()
+    def extract_images_and_upload(file_path: str = None, file_url: str = None, output_filename: str = None):
+        """从Word/PDF/PPT/Excel文件中提取图片，打包为ZIP文件并上传到服务器，返回公网下载链接。"""
+        return image_extraction_tools.extract_images_and_upload(file_path, file_url, output_filename)
+
+    @mcp.tool()
+    def get_supported_formats():
+        """获取图片提取工具支持的文件格式信息。"""
+        return image_extraction_tools.get_supported_formats()
 
 
 def run_server():
